@@ -1,0 +1,353 @@
+---
+title: "NYPDData"
+author: "Samuel Head"
+date: "2023-08-18"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. 
+
+
+Before we being the assignmnet we are first going to load the packages needed to perform our analysis of the NYPD Shooting Incident Data.
+```{r packages, include = TRUE}
+
+library(tidyverse)
+library(lubridate)
+```
+
+## Step One: Start an RMD document
+Start an RMD document that describes and imports the shooting project data set in a reproducible manner.
+
+### Uplodaing Data 
+The next step in our prcoess is to uplaod the NYPD Shooting Incident Data. The data is currenlty a CSV file that we donwloaded from the internet. 
+Note: Having trouble downloading CSV to computer then upoading to R Studio. Solution, copy the direct link and have RStudio read csv from URL. 
+```{r read_csv, include = TRUE}
+url <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD"
+nypd_data <- read_csv(url)
+```
+
+
+After uploading the data, we run a test to make sure the data was properly retrieved from the website.
+``` {r test_upload_of_Data, include = TRUE}
+nypd_data
+```
+
+As of this step we have sucessfully created a RStudio Markdown file and have sucessfully uploaded the required data for this assignment. 
+
+### Describe Data 
+From viewing the data. The files contains multiple columns labeled: INCIDENT_KEY, OCCUR_DAT, OCCUR_TIME, BORO, LOC_OF_OCCUR_DESC, PRESCINT, JURISDICTION_CODE, LOC_CLASSFCTN_DESC, LOCATION_DESC, STATISTICAL_MURDER_FLAG, PERP_AGE_GROUP, PERP_RACE, VIC_AGE_GROUP, VIC_SEX, VIC_RACE, X_COOR, Y_COOR, LATITUDE, LONGITUDE, LON_LAT. The dataset contain columns that are misssing data. For my analysis I will also not be utilizing all the columns. Thereore, I need to hihglihgt which columns I will be using for my analysis. The data also hold information regarding shooting incident in New York. I will be able to learn more about the data as I go through my analysis. 
+
+We can also summarize the data using the summary function. 
+```{r summary_data, include = TRUE}
+summary(nypd_data)
+
+```
+## Step 2: Tidy and Transform Data 
+Add to your Rmd document a summary of the data and clean up your dataset by changing appropriate variables to factor and date types and getting rid of any columns not needed.  Show the summary of your data to be sure there is no missing data. If there is missing data, describe how you plan to handle it.
+
+Our goal is to clean our data now. First we want to find which columns are unnecessary and which columns are the wrong data type. 
+The columns that I want to keep for my analysis are:
+-Incident_Key 
+-Occur_Date
+-Occur_Time
+-Boro
+-Precinct
+
+I also noticed that the OCCUR_DATE is in the wrong format. I need to change the format from character to date. I would also like to create a more condensed data frame containing only the columns that I am interested in. 
+
+
+``` {r dataFrame, inlcude = TRUE}
+
+
+data_frame = nypd_data %>%
+  select(c(INCIDENT_KEY, OCCUR_DATE, OCCUR_TIME, BORO, PRECINCT)) %>%
+  mutate(OCCUR_DATE = mdy(OCCUR_DATE))
+
+data_frame
+
+
+
+```
+Next, I am producing a summary of the new data frame.
+```{r summary_df, include=TRUE}
+
+summary(data_frame)
+
+```
+## Step 3: Add visualizations and Analysis
+Add at least two different visualizations & some analysis to your Rmd.  Does this raise additional questions that you should investigate? 
+
+From what I can tell, there seems to be no missing information. Therefore, I can continue with my analysis. For the next step of the project I have to add a minimum of two visualizations and some analyis to my R markdown. 
+
+For the first half of my visualization and analysis portion. I would like to see which areas have the highest crime. I can do this by analyzing the dataframe to see which BORO occurs most in the data. For the second half of my analysis, I will be determining which year did the most cases appear. These two analyses can help provide insight into which area has the most shootings and if crime has increased, decreased, or has not changed over the years. To begin the analysis portion, we need to find how many distinct BORO and which years the incodents occur.
+
+### First analysis and visualization
+```{r unique_values, include= TRUE}
+
+unique_cities <- unique(data_frame$BORO)
+
+unique_cities
+
+```
+Since, we have now identified the unique cities in the data we can use them to further our analysis. Create a loop to count how often each city occurs in the dataframe. We can create a loop to do though the BORO column and count the number of time each city name occurred. 
+
+``` {r count_cases,include = TRUE}
+Queens = 0
+Bronx = 0 
+Brooklyn = 0 
+Manhattan = 0
+StatenIsland = 0
+
+for (i in 1:length(data_frame$BORO)){
+  if (data_frame$BORO[i] == "QUEENS") 
+  {
+    Queens = Queens +1
+  }
+  else if (data_frame$BORO[i]== "BRONX")
+  {
+    Bronx = Bronx +1 
+  }
+  else if (data_frame$BORO[i] == "BROOKLYN")
+  {
+    Brooklyn = Brooklyn +1
+  }
+  else if (data_frame$BORO[i] == "MANHATTAN" )
+  {
+    Manhattan = Manhattan +1
+  
+  }
+  else if (data_frame$BORO[i]== "STATEN ISLAND")
+  {
+    StatenIsland = StatenIsland +1
+  }
+}
+
+
+
+total = Queens + Bronx+ Brooklyn + Manhattan+ StatenIsland
+print(paste("There was a total of ", total, " cases throughout Queens, Bronx, Brooklyn, Manhattan, and Staten Island."))
+print(paste("There was a total of", Bronx," cases in the Bronx."))
+print(paste("There was a total of", Queens," cases in the Queens."))
+print(paste("There was a total of", Brooklyn," cases in the Brooklyn."))
+print(paste("There was a total of", Manhattan," cases in the Manhattan."))
+print(paste("There was a total of", StatenIsland," cases in the Staten Island."))
+```
+Since we know which cities are involved and how many casses occur in each city. We can now create a bar graph to represent the data given. 
+
+``` {r bar_graph, include = TRUE}
+cities <- c("Bronx", "Queens", "Brooklyn", "Manhattan", "Staten Island")
+total_cases <- c( Bronx, Queens, Brooklyn, Manhattan, StatenIsland)
+
+df <-data.frame(cities, total_cases)
+
+bar <- ggplot(data = df, aes(x = cities, y = total_cases)) +
+  geom_bar(stat = "identity", color = "blue", fill = "blue")+
+  labs(title = "Total Number of Shooting Incidents Covering Five Cities In New York", x= "Cities", y = "Total Cases")+
+  theme_minimal()
+
+bar
+```
+From observing the above graph we can tell that the city that has the most incidents is Brooklyn while the city with the least amount of incidents is Staten Island. 
+
+### Second analysis and visualization
+For the next portion of my analysis I will determine which year had the most crime. I will begin by editing the the data frame. I am going to seperate OCCUR_DATE into three sections: Year, Month, and Day. By doing this I can create a loop to go thru each year and tally how many cases occured in each year. 
+```{r sep_OCCUR_DATE, include = TRUE}
+data_frame2 <- separate(data_frame, col = OCCUR_DATE, into = c("Year", "Month", "Day"), sep = "-")
+
+```
+
+I am going to find the max and min of the years that the incidents occured to determine which years the data set covers. I am also going to determine which days the data set being and ends to determine if the data cover each year completely. 
+```{r total_in_year, include = TRUE}
+
+begin_year <- min(data_frame2$Year)
+end_year <-max(data_frame2$Year)
+
+begin_day <- min(data_frame$OCCUR_DATE)
+end_day <- max(data_frame$OCCUR_DATE)
+
+print(paste("The data set begins recording data in", begin_year, "until", end_year, "."))
+print(paste("The data set begins recording data on", begin_day, "until", end_day, "."))
+
+```
+
+The incidents are recorded from 2006 to 2022. Therefore, we can create a loop to tally the number of incidents for each year. 
+The incidents cover a span of 16 years.
+
+``` {r loop_for_years, include = TRUE}
+total_2006 = 0
+total_2007 = 0 
+total_2008 = 0 
+total_2009 = 0
+total_2010 = 0
+total_2011 = 0
+total_2012 = 0
+total_2013 = 0
+total_2014 = 0
+total_2015 = 0
+total_2016 = 0
+total_2017 = 0
+total_2018 = 0
+total_2019 = 0
+total_2020 = 0
+total_2021 = 0
+total_2022 = 0
+
+
+for (i in 1:length(data_frame2$Year))
+{
+  if (data_frame2$Year[i] == 2006)
+  {
+    total_2006 = total_2006 + 1
+  }
+  else if (data_frame2$Year[i] == 2007)
+  {
+    total_2007 = total_2007 + 1
+  }
+    else if (data_frame2$Year[i] == 2008)
+  {
+    total_2008 = total_2008 + 1
+  }
+    else if (data_frame2$Year[i] == 2009)
+  {
+    total_2009 = total_2009 + 1
+  }
+    else if (data_frame2$Year[i] == 2010)
+  {
+    total_2010 = total_2010 + 1
+  }
+    else if (data_frame2$Year[i] == 2011)
+  {
+    total_2011 = total_2011 + 1
+  }
+    else if (data_frame2$Year[i] == 2012)
+  {
+    total_2012 = total_2012 + 1
+  }
+    else if (data_frame2$Year[i] == 2013)
+  {
+    total_2013 = total_2013 + 1
+  }
+    else if (data_frame2$Year[i] == 2014)
+  {
+    total_2014 = total_2014 + 1
+  }
+    else if (data_frame2$Year[i] == 2015)
+  {
+    total_2015 = total_2015 + 1
+  }
+    else if (data_frame2$Year[i] == 2016)
+  {
+    total_2016 = total_2016 + 1
+  }
+    else if (data_frame2$Year[i] == 2017)
+  {
+    total_2017 = total_2017 + 1
+  }
+  else if (data_frame2$Year[i] == 2018)
+  {
+    total_2018 = total_2018 + 1
+  }
+  else if (data_frame2$Year[i] == 2019)
+  {
+    total_2019 = total_2019 + 1
+  }
+  else if (data_frame2$Year[i] == 2020)
+  {
+    total_2020 = total_2020 + 1
+      }
+  else if (data_frame2$Year[i] == 2021)
+  {
+    total_2021 = total_2021 + 1
+  }
+  else if (data_frame2$Year[i] == 2022)
+  {
+    total_2022 = total_2022 + 1
+  }
+}
+
+
+print(paste("The was a total of", total_2006, "shooting incidents in 2006."))
+print(paste("The was a total of", total_2007, "shooting incidents in 2007."))
+print(paste("The was a total of", total_2008, "shooting incidents in 2008."))
+print(paste("The was a total of", total_2009, "shooting incidents in 2009."))
+print(paste("The was a total of", total_2010, "shooting incidents in 2010."))
+print(paste("The was a total of", total_2011, "shooting incidents in 2011."))
+print(paste("The was a total of", total_2012, "shooting incidents in 2012."))
+print(paste("The was a total of", total_2013, "shooting incidents in 2013."))
+print(paste("The was a total of", total_2014, "shooting incidents in 2014."))
+print(paste("The was a total of", total_2015, "shooting incidents in 2015."))
+print(paste("The was a total of", total_2016, "shooting incidents in 2016."))
+print(paste("The was a total of", total_2017, "shooting incidents in 2017."))
+print(paste("The was a total of", total_2018, "shooting incidents in 2018."))
+print(paste("The was a total of", total_2019, "shooting incidents in 2019."))
+print(paste("The was a total of", total_2020, "shooting incidents in 2020."))
+print(paste("The was a total of", total_2021, "shooting incidents in 2021."))
+print(paste("The was a total of", total_2022, "shooting incidents in 2022."))
+
+
+```
+Now that I have determined how many incidents occur in each year. I am going to create a visualization to help display the information I found. 
+
+```{r bar_plot2, include = TRUE}
+
+indv_years <- c(2006,2007,2008,2009,2010,2011,2012,2013,2014,2015,2016,2017,2018,2019,2020,2021,2022)
+total_cases_year <- c(total_2006, total_2007,total_2008,total_2009,total_2010,total_2011,total_2012,total_2013,total_2014,total_2015,total_2016,total_2017, total_2018,total_2019,total_2020,total_2021,total_2022)
+
+df <-data.frame(indv_years, total_cases_year)
+
+bar2 <- ggplot(data = df, aes(x = indv_years, y = total_cases_year)) +
+  geom_bar(stat = "identity", color = "blue", fill = "blue")+
+  labs(title = "Total Shooting That Occurred in Each Year in New York", x ="Year", y = "Total Incidents")+
+  theme_minimal()
+
+bar2
+```
+### Model
+Lastly, I need to include a model to go along with my above diagrams. I am going to model a predictive line of the total number of cases throughout the years over the above bar graph containig the total number of cases each year. 
+
+
+``` {r model_cases, include = TRUE}
+
+mod<- lm(total_cases_year ~ indv_years, data = df)
+summary(mod)
+
+```
+
+``` {r model_graph, include = TRUE}
+pred = predict(mod)
+bar3 <-ggplot(data = df, aes(x = indv_years, y = total_cases_year)) +
+  geom_bar(stat = "identity", color = "blue", fill = "blue")+
+  labs(title = "Total Shooting That Occurred in Each Year in New York", x ="Year", y = "Total Incidents")+
+  geom_line(aes(x = indv_years, y = pred), color = "black")
+  theme_minimal()
+  
+bar3
+ 
+```
+### Questions that arose from analysis 
+
+During my analysis there were additionally questions that arose. While analysing the total cases per year and total cases per city there were multiple question that arose that could use further analysis. 
+1) How does crime overlap with the time of the year? For instace, is there more or less crime in the summer versus the winter?
+2) how do individual cities crime rates differ throughout the year? We analyzed the overall state but how have individual cities total incidents change throuhghout the year? Are cities reporting more or less incidents. 
+3) How many incidents occured that have not been documented?
+4) How does age and race relate to incident rate?
+
+All of these questions arose and could use further analysis. 
+
+
+## Step 4: Add bias Identification
+Write the conclusion to your project report and include any possible sources of bias.  Be sure to identify what your personal bias might be and how you have mitigated that.
+
+To conclude my report, I discovered that there was a total of 27,312 shooting incident cases that spread across five distinct districts in New York over the course of 16 year (2006-2022). The city that expereinced the most incidents over these year was Brooklyn while the least being Staten Island. Additionally, over the years New York expereinced the most incidents in 2006. With the least amount of incidents being in 2018. From the analysis, the overall number of shooting incidents seemed to be decreasing until recent years where a large increase occurred in 2020. Overall, from the model that overlaps the bar graph containing the number of total incidents the trend shows a decreasing amount of incidents over the years. 
+
+During the analysis I came across selection bias. I wanted to focus on specific years. For instance, specifically studying the number of incidents during a designated timeline such as the most recent years (2020-2022). However, I furthered my analysis to cover the whole timeline that occurred in the the data set (2006-2022). Expanding my analysis to cover the whole data set helped to mitigate bias because during the most recent years there was a spike in incidents. Without acknowledging the previous decrease in incidents my analysis would have greatly differed. 

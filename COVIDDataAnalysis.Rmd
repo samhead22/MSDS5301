@@ -1,0 +1,448 @@
+---
+libtrtitle: hw
+author: "Samuel Head"
+date: "2023-08-08"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+
+First we are going to load the necessary packages for our analysis of the COVID19 dataset.
+
+```{r load packages needed, include = TRUE}
+
+library(tidyverse)
+```
+Next we are going to create the necessary URL's needed for the four data sets we will be using. By creating these URL's we can have r Studio pull the required datasets from the internet. 
+```{r creating url, include = TRUE}
+
+urls_in <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/csse_covid_19_time_series/"
+
+file_names <- c("time_series_covid19_confirmed_global.csv", "time_series_covid19_deaths_global.csv", "time_series_covid19_confirmed_US.csv", "time_series_covid19_deaths_US.csv")
+
+urls <- str_c(urls_in, file_names)
+
+urls
+```
+Next we are going to assign each data set a variable.
+``` {r saving url as variables, include = TRUE}
+global_cases <- read_csv(urls[1])
+global_deaths <- read_csv(urls[2])
+US_cases <- read_csv(urls[3])
+US_deaths <- read_csv(urls[4])
+```
+
+For our next step we will want to being cleaning the data we pulled.
+``` {r clean global cases, include = TRUE}
+
+global_cases <- global_cases %>%
+  pivot_longer(cols = -c('Province/State',
+                            'Country/Region', Lat, Long),
+                  names_to = "date",
+                  values_to = "cases") %>%
+     select(-c(Lat,Long))
+
+global_cases
+```
+
+
+
+We are going to clean the gloabl deaths and the global clean datasets. Once we clean both we can join each dataset together.
+``` {r following_video_clean_global_deaths, include = TRUE}
+library(lubridate)
+
+
+global_deaths <- global_deaths %>%
+  pivot_longer(cols = -c('Province/State',
+                            'Country/Region', Lat, Long),
+                  names_to = "date",
+                  values_to = "cases") %>%
+     select(-c(Lat,Long))
+
+global <- global_cases %>%
+  full_join(global_deaths) %>%
+  rename(Country_Region = 'Country/Region',
+         Province_State = 'Province/State') %>%
+  mutate(date= mdy(date))
+```
+If we look at our new variable "global" we will see that our date column is now a date format, we have cases and death, and we have also renamed variables.
+``` {r global}
+global
+```
+now we can look at the summary of the data to see if we have any problems
+``` {r summary}
+summary(global)
+```
+
+Since we have rows with 0 cases, we will filter out these rows to get dates where we only have positive numbers.
+``` {r filter_out_zero_cases, include = TRUE}
+global <- global %>% filter(cases >0)
+``` 
+we can then resummarize data.
+
+``` {r resummarize, include = TRUE}
+summary(global)
+
+```
+We can now see that our minimum is 1 and our max is 100 million. We can then take another step to double check that the 100 million is not a typo.
+
+These are some measure you should take when doing an analysis. 
+
+``` {r double_check_max}
+global %>% filter(cases > 100000000)
+```
+
+The data looks correct so far because we have multiple data points in the US that surpass 100 million. Therefore, our max is not an outlier. Now our goal is to do an analysis on the us_cases.
+
+``` {r us cases, include = TRUE}
+US_cases
+```
+Now we are going to being cleaning up our data sets that contain data rearding the United States. 
+``` {r us_analysis, include = TRUE}
+US_cases %>%
+  pivot_longer(cols = -(UID:Combined_Key),
+               names_to = "date",
+               values_to = "cases")
+```
+``` {r fix_up_more, include = TRUE}
+US_cases <- US_cases %>%
+  pivot_longer(cols = -(UID: Combined_Key),
+               names_to = "date",
+               values_to = "cases") %>%
+  select(Admin2:cases) %>%
+  mutate(date = mdy(date)) %>%
+  select(-c(Lat, Long_))
+
+US_cases
+```
+
+Now that we have cleaned our dataset recodring US cases we are going to repeat the above steps for our US deaths dataset. 
+``` {r us_dead, include = TRUE}
+US_deaths <- US_deaths %>%
+  pivot_longer(cols = -(UID: Population),
+               names_to = "date",
+               values_to = "deaths") %>%
+  select(Admin2:deaths) %>%
+  mutate(date = mdy(date)) %>%
+  select(-c(Lat, Long_))
+
+US_deaths
+```
+
+Now since we have both US cases and US deaths cleaned we can join both data sets together. 
+``` {r join_the_above_tables, include = TRUE}
+US <- US_cases %>%
+  full_join(US_deaths)
+
+US
+```
+
+
+``` {r globe, include = TRUE}
+global <- global %>%
+  unite("UniteCombined_Key",
+        c(Province_State, Country_Region),
+        sep =", ",
+        na.rm = TRUE, 
+        remove = FALSE)
+global
+```
+
+WE need the UID and join with global data set
+
+```{r uid_w_global, include = TRUE}
+uid_lookup_url <- "https://raw.githubusercontent.com/CSSEGISandData/COVID-19/master/csse_covid_19_data/UID_ISO_FIPS_LookUp_Table.csv"
+
+
+uid <- read_csv(uid_lookup_url) %>%
+  select(-c(Lat, Long_, Combined_Key, code3, iso2, iso3, Admin2))
+
+```
+
+
+{r join_UID, include = TRUE}
+global <- global %>%
+  left_join(uid, by = c("Province_State", "Country_Region")) %>%
+  select(-c(UID, FIPS)) %>%
+  select(Province_State, Country_Region, date, 
+         cases, deaths, Population, 
+         Combined_key)
+global
+
+Next we would like to filter the data set so that we can view the number of deaths in each state. 
+
+
+```{r death_by_state, include = TRUE}
+
+US_by_state <- US %>%
+  group_by(Province_State, Country_Region, date) %>%
+  summarize(cases = sum(cases), deaths = sum(deaths),
+            Population = sum(Population)) %>%
+  mutate(death_per_mill = deaths * 1000000 / Population) %>%
+  select(Province_State, Country_Region, date, cases, deaths, death_per_mill, Population) %>% 
+  ungroup()
+
+US_by_state
+```
+
+We will also be including a dataset of the deaths per million in the entire country. 
+``` {r total_death, include = TRUE}
+US_totals <- US_by_state %>%
+  group_by(Country_Region, date) %>%
+  summarize(cases = sum(cases), deaths = sum(deaths),
+            Population = sum(Population)) %>%
+  mutate(death_per_mill = deaths *1000000/ Population) %>%
+  select(Country_Region, date, 
+         cases, deaths, death_per_mill, Population) %>%
+  ungroup()
+US_totals
+```
+This will help us view the end of our data set to see how the beginning and end differ. 
+``` {r tail_end, include = TRUE}
+tail(US_totals)
+```
+
+Our next step is to create some visualizations of our analysis. We are creating a plot of the total number of cases versus the total number of deaths in the United States. Be careful with the valyes because the y valyes are scaled by a log function. 
+
+``` {r visualize, include = TRUE}
+US_totals %>%
+  filter(cases >0) %>%
+  ggplot(aes( x = date, y = cases)) +
+  geom_line(aes(color = "cases")) +
+  geom_point(aes(color = "cases")) +
+  geom_line(aes(y= deaths, color = "deaths")) +
+  geom_point(aes(y=deaths, color = "deaths")) +
+  scale_y_log10() +
+  theme(legend.position = "bottom" , 
+        axis.text.x = element_text(angle = 90)) +
+  labs(title = "COVID19 in US" , y = NULL)
+```
+On top of our visualization of the United States data, we will be viewing a specific state in the United States to see the trends in the cases vs total deaths, similarly to the graph above. I will be looking at two states both "California", "Colorado" and "Arizona".
+``` {r visualize_state_california, include = TRUE}
+state <- "California"
+
+US_by_state %>%
+  filter(Province_State == state) %>%
+  filter(cases >0) %>%
+  ggplot(aes( x = date, y = cases)) +
+  geom_line(aes(color = "cases")) +
+  geom_point(aes(color = "cases")) +
+  geom_line(aes(y= deaths, color = "deaths")) +
+  geom_point(aes(y=deaths, color = "deaths")) +
+  scale_y_log10() +
+  theme(legend.position = "bottom" , 
+        axis.text.x = element_text(angle = 90)) +
+  labs(title = str_c("COVID19 in ", state) , y = NULL)
+```
+``` {r visualize_state_colorado, include = TRUE}
+state <- "Colorado"
+
+US_by_state %>%
+  filter(Province_State == state) %>%
+  filter(cases >0) %>%
+  ggplot(aes( x = date, y = cases)) +
+  geom_line(aes(color = "cases")) +
+  geom_point(aes(color = "cases")) +
+  geom_line(aes(y= deaths, color = "deaths")) +
+  geom_point(aes(y=deaths, color = "deaths")) +
+  scale_y_log10() +
+  theme(legend.position = "bottom" , 
+        axis.text.x = element_text(angle = 90)) +
+  labs(title = str_c("COVID19 in ", state) , y = NULL)
+```
+``` {r visualize_state_ari, include = TRUE}
+state <- "Arizona"
+
+US_by_state %>%
+  filter(Province_State == state) %>%
+  filter(cases >0) %>%
+  ggplot(aes( x = date, y = cases)) +
+  geom_line(aes(color = "cases")) +
+  geom_point(aes(color = "cases")) +
+  geom_line(aes(y= deaths, color = "deaths")) +
+  geom_point(aes(y=deaths, color = "deaths")) +
+  scale_y_log10() +
+  theme(legend.position = "bottom" , 
+        axis.text.x = element_text(angle = 90)) +
+  labs(title = str_c("COVID19 in ", state) , y = NULL)
+```
+
+
+Nex in our analysis we need to find the max number of deaths and the end date of our data set. 
+``` {r max_num, include = TRUE}
+
+max(US_totals$date)
+max(US_totals$deaths)
+```
+
+Next we are going to calculate the about of new cases and new deaths in each state and throughout the country as a whole. 
+``` {r more_analysis, include = TRUE}
+
+US_by_state <- US_by_state %>%
+  mutate(new_cases = cases - lag(cases),
+         new_deaths = deaths - lag(deaths))
+
+US_totals <- US_totals %>%
+  mutate(new_cases = cases - lag(cases), 
+         new_deaths = deaths - lag(deaths))
+
+
+```
+
+Print out the new data set of US_total. The total of new cases and new deaths will be displayed. 
+``` {r tail_totals, include = TRUE}
+
+tail(US_totals)
+
+```
+
+We can reorganize the table so that the total for new cases and new deaths are displayed first. 
+``` {r filter_tail}
+tail(US_totals %>% select(new_cases, new_deaths, everything()))
+
+
+```
+Next I will create a graph of the number of new cases and the total number of deaths throughout the United States. 
+``` {r graph_newCasesandDeaths, include = TRUE}
+
+US_totals %>%
+  filter(cases >0) %>%
+  ggplot(aes( x = date, y = new_cases)) +
+  geom_line(aes(color = "new_cases")) +
+  geom_point(aes(color = "new_cases")) +
+  geom_line(aes(y= deaths, color = "new_deaths")) +
+  geom_point(aes(y=deaths, color = "new_deaths")) +
+  scale_y_log10() +
+  theme(legend.position = "bottom" , 
+        axis.text.x = element_text(angle = 90)) +
+  labs(title = "COVID19 in US" , y = NULL)
+
+```
+
+I will also create a similar visualization for California, Colorado and Arizona. 
+``` {r newByStateCal, include = TRUE}
+state <- "California"
+
+US_by_state %>%
+  filter(Province_State == state) %>%
+  filter(cases >0) %>%
+  ggplot(aes( x = date, y = new_cases)) +
+  geom_line(aes(color = "new_cases")) +
+  geom_point(aes(color = "new_cases")) +
+  geom_line(aes(y= deaths, color = "new_deaths")) +
+  geom_point(aes(y=deaths, color = "new_deaths")) +
+  scale_y_log10() +
+  theme(legend.position = "bottom" , 
+        axis.text.x = element_text(angle = 90)) +
+  labs(title = str_c("COVID19 in ", state) , y = NULL)
+```
+
+
+``` {r newByStateCol, include = TRUE}
+state <- "Colorado"
+
+US_by_state %>%
+  filter(Province_State == state) %>%
+  filter(cases >0) %>%
+  ggplot(aes( x = date, y = new_cases)) +
+  geom_line(aes(color = "new_cases")) +
+  geom_point(aes(color = "new_cases")) +
+  geom_line(aes(y= deaths, color = "new_deaths")) +
+  geom_point(aes(y=deaths, color = "new_deaths")) +
+  scale_y_log10() +
+  theme(legend.position = "bottom" , 
+        axis.text.x = element_text(angle = 90)) +
+  labs(title = str_c("COVID19 in ", state) , y = NULL)
+```
+
+``` {r newByStateAri, include = TRUE}
+state <- "Arizona"
+
+US_by_state %>%
+  filter(Province_State == state) %>%
+  filter(cases >0) %>%
+  ggplot(aes( x = date, y = new_cases)) +
+  geom_line(aes(color = "new_cases")) +
+  geom_point(aes(color = "new_cases")) +
+  geom_line(aes(y= deaths, color = "new_deaths")) +
+  geom_point(aes(y=deaths, color = "new_deaths")) +
+  scale_y_log10() +
+  theme(legend.position = "bottom" , 
+        axis.text.x = element_text(angle = 90)) +
+  labs(title = str_c("COVID19 in ", state) , y = NULL)
+```
+
+Next in the analysis, I will be determining which states have the highest and least infection rate throughout the United States.
+``` {r filterByStateMax, include = TRUE}
+
+US_state_totals <- US_by_state %>%
+  group_by(Province_State) %>%
+  summarize(deaths = max(deaths), cases = max(cases),
+            population = max(Population),
+            cases_per_thou = 1000 * cases / population,
+            deaths_per_thou = 1000 * deaths / population) %>%
+  filter(cases >0, population >0)
+```
+
+This section of code will produce the areas with the lowest fatality rate. 
+``` {r above_cont}
+US_state_totals %>%
+  slice_min(deaths_per_thou, n=10) %>%
+  select(deaths_per_thou, cases_per_thou, everything())
+
+```
+This section of code will produce the section with the highest fatality rate.
+``` {r above_cont_worseStates, include = TRUE}
+US_state_totals %>%
+  slice_max(deaths_per_thou, n=10) %>%
+  select(deaths_per_thou, cases_per_thou, everything())
+
+```
+
+Lastly, we will create a model of our data. THe code chuck below will create a model by comparing the deaths and cases per thousand from the US_State_total data frame. 
+``` {r model}
+mod<- lm(deaths_per_thou ~ cases_per_thou, data = US_state_totals)
+summary(mod)
+```
+
+This oce chuck will find our max and min for the number of cases. 
+``` {r maxMin,include R}
+US_state_totals %>% slice_min(cases_per_thou)
+US_state_totals %>% slice_max(cases_per_thou)
+```
+
+Now based off our information we will create a linear model that best fit our data. 
+``` {r prediction, include = TRUE}
+US_state_totals %>% mutate(pred = predict(mod))
+```
+
+Precition code continued. 
+``` {r pred, include = TRUE}
+US_tot_w_pred <- US_state_totals %>% mutate(pred = predict(mod))
+US_tot_w_pred
+```
+
+Final visualization of out model and our data set comparing deaths per thousand and cases per thousand.
+``` {r graph+pred}
+US_tot_w_pred %>% ggplot() +
+  geom_point(aes(x=cases_per_thou, y = deaths_per_thou), color = "blue") +
+  geom_point(aes(x = cases_per_thou, y = pred), color = "red")
+```
+
+
+Concluding my report, I noticed that bias may have occurred throughout my analysis. The top form of bias can have occurred due to the accuracy of reporting. In some district resources may have not been as readily available. Therefore, this may have led to a significant number of cases not being accurately reported due to insufficient testing and resources. This could lead to inaccuracy of maximum and minimum cases reported in a day for the country or individual states. 
+
+
